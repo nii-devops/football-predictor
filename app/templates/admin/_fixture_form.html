@@ -1,0 +1,25 @@
+
+
+<!-- fixture_form.html - Template for dynamically added fixture forms -->
+<div class="fixture-form-group border rounded p-3 mb-3" data-index="__INDEX__">
+    <div class="row align-items-center">
+        <div class="col-md-4 col-sm-4">
+            {{ form.home_team.label(class="form-label") }}
+            {{ form.home_team(class="form-select") }}
+        </div>
+        <div class="col-md-2 text-center">
+            <strong>vs</strong>
+        </div>
+        <div class="col-md-4 col-sm-4">
+            {{ form.away_team.label(class="form-label") }}
+            {{ form.away_team(class="form-select") }}
+        </div>
+        <div class="col-md-2 justify-content-center align-items-center">
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeFixture(this)">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    </div>
+    
+</div>
+

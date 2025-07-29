@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-cogs"></i> Admin Dashboard</h2>
+        <p class="text-muted">Manage match weeks and fixtures</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Quick Actions</h5>
+                <a href="{{ url_for('main.create_match_week') }}" class="btn epl-primary text-white me-2">
+                    <i class="fas fa-plus"></i> Create Match Week
+                </a>
+                <button class="btn btn-success" onclick="importFixtures()">
+                    <i class="fas fa-download"></i> Import from Sky Sports
+                </button>
+                <a href="{{ url_for('main.create_season') }}" class="btn btn-secondary text-white me-2">
+                    <i class="fas fa-plus"></i> Create Season
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <h3>Match Weeks</h3>
+        {% if match_weeks %}
+        {% for match_week in match_weeks %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h5 class="card-title">
+                            {{ match_week.name }}
+                            {% if match_week.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% endif %}
+                        </h5>
+                        <p class="card-text">
+                            <small class="text-muted">
+                                Week {{ match_week.week_number }} | 
+                                {{ match_week.fixtures|length }} fixtures | 
+                                Predictions: {{ match_week.predictions_open_time.strftime('%Y-%m-%d %H:%M') }} - 
+                                {{ match_week.predictions_close_time.strftime('%Y-%m-%d %H:%M') }}
+                            </small>
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        {% if not match_week.is_active %}
+                        <form method="POST" action="{{ url_for('main.activate_match_week', week_id=match_week.id) }}" class="d-inline">
+                            <button type="submit" class="btn btn-outline-success btn-sm">Activate</button>
+                        </form>
+                        {% endif %}
+                        <button class="btn btn-outline-primary btn-sm" onclick="viewFixtures({{ match_week.id }})">
+                            View Fixtures
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Fixtures details (collapsible) -->
+                <div class="collapse" id="fixtures-{{ match_week.id }}">
+                    <hr>
+                    <div class="row">
+                        {% for fixture in match_week.fixtures %}
+                        <div class="col-md-6 mb-2">
+                            <div class="small">
+                                <strong>{{ fixture.home_team }}</strong> vs <strong>{{ fixture.away_team }}</strong><br>
+                                <span class="text-muted">{{ fixture.match_datetime.strftime('%Y-%m-%d %H:%M') }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> No match weeks created yet. Create your first match week to get started!
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function viewFixtures(weekId) {
+    const element = document.getElementById(`fixtures-${weekId}`);
+    const collapse = new bootstrap.Collapse(element);
+    collapse.toggle();
+}
+
+function importFixtures() {
+    if (confirm('Import fixtures from Sky Sports? This may take a moment.')) {
+        fetch('/admin/import_fixtures', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Successfully imported ${data.count} fixtures!`);
+                location.reload();
+            } else {
+                alert('Error importing fixtures: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error importing fixtures');
+        });
+    }
+}
+</script>
+{% endblock %}
