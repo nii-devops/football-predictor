@@ -14,7 +14,7 @@ virt/
 # Flask instance folder (if using app factory pattern)
 instance/
 backup/
-migrations/
+test/
 
 # Other folders
 
