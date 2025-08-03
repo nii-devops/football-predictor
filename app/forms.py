@@ -16,6 +16,10 @@ this_year = datetime.now().year
 
 
 class FixtureForm(FlaskForm):
+    class Meta:
+        # Disable CSRF for this form since it's used within a FieldList
+        csrf = False
+    
     home_team = SelectField('Home Team', choices=[(team, team) for team in EPL_TEAMS], validators=[DataRequired()])
     away_team = SelectField('Away Team', choices=[(team, team) for team in EPL_TEAMS], validators=[DataRequired()])
     #match_datetime = DateTimeField('Match Date & Time', validators=[DataRequired()], format='%Y-%m-%dT%H:%M')
@@ -27,7 +31,7 @@ class CreateMatchWeekForm(FlaskForm):
     season = SelectField('Season', validators=[DataRequired()])
     predictions_open_time = DateTimeField('Predictions Open Time', validators=[DataRequired()], format='%Y-%m-%dT%H:%M')
     predictions_close_time = DateTimeField('Predictions Close Time', validators=[DataRequired()], format='%Y-%m-%dT%H:%M')
-    fixtures = FieldList(FormField(FixtureForm), min_entries=1)
+    fixtures = FieldList(FormField(FixtureForm), min_entries=1, max_entries=20)
     submit = SubmitField('Create Match Week')
 
 

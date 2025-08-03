@@ -3,6 +3,7 @@ from flask_login import login_user, login_required, logout_user, current_user
 from datetime import datetime, timedelta
 from .models import db, User, Season, MatchWeek, Fixture, Prediction, Week
 from .forms import FixtureForm, CreateMatchWeekForm, PredictionForm, CreateSeasonForm
+from wtforms import FieldList, FormField
 from . import oauth
 import os
 
@@ -100,28 +101,71 @@ def admin_dashboard():
     if not current_user.is_admin:
         flash('Access denied. Admin privileges required.', 'error')
         return redirect(url_for('main.index'))
-    match_weeks = MatchWeek.query.order_by(MatchWeek.week_id.desc()).all()
-    return render_template('admin/dashboard.html', match_weeks=match_weeks)
+    return render_template('admin/dashboard.html')
+
+
+@bp.route('/admin/test_route')
+@login_required
+def test_route():
+    print("=== TEST ROUTE CALLED ===")
+    return "Test route works!"
 
 
 @bp.route('/admin/create_match_week', methods=['GET', 'POST'])
 @login_required
 def create_match_week():
+    print("=== CREATE MATCH WEEK ROUTE CALLED ===")
     if not current_user.is_admin:
         flash('Access denied. Admin privileges required.', 'error')
         return redirect(url_for('main.index'))
-    # Query all seasons in ascending order
-    weeks = Week.query.order_by(Week.id).all()
-    week_choices = [(week.id, f"Week {week.week_number}") for week in weeks]
     
-    seasons = Season.query.order_by(Season.season_start_year.asc()).all()
+    # Test database connection
+    try:
+        weeks = Week.query.order_by(Week.id).all()
+        print(f"Found {len(weeks)} weeks in database")
+        seasons = Season.query.order_by(Season.season_start_year.asc()).all()
+        print(f"Found {len(seasons)} seasons in database")
+    except Exception as e:
+        print(f"Database connection error: {str(e)}")
+        flash(f'Database error: {str(e)}', 'error')
+        return redirect(url_for('main.admin_dashboard'))
+    
+    week_choices = [(week.id, f"Week {week.week_number}") for week in weeks]
     season_choices = [(season.id, f"{season.season_start_year}-{season.season_end_year}") for season in seasons]
 
-    form = CreateMatchWeekForm()
+    # Initialize form with POST data if this is a POST request
+    if request.method == 'POST':
+        # Count the number of fixtures in the POST data
+        num_fixtures = len([key for key in request.form if key.startswith('fixtures-') and key.endswith('-home_team')])
+        print(f"Number of fixtures detected in POST data: {num_fixtures}")
+        
+        # Create a new form class with the correct number of entries
+        if num_fixtures > 0:
+            # Create a dynamic form class with the right number of entries
+            class DynamicCreateMatchWeekForm(CreateMatchWeekForm):
+                fixtures = FieldList(FormField(FixtureForm), min_entries=num_fixtures, max_entries=20)
+            
+            form = DynamicCreateMatchWeekForm(request.form)
+        else:
+            form = CreateMatchWeekForm(request.form)
+    else:
+        form = CreateMatchWeekForm()
+    
     form.season.choices = season_choices
     form.week_number.choices = week_choices
 
+    print(f"Request method: {request.method}")
+    print(f"Form is submitted: {form.is_submitted()}")
+    print(f"Form validation: {form.validate()}")
+    print(f"Form data: {request.form}")
+    print(f"Number of fixtures in form: {len(form.fixtures)}")
+    if not form.validate():
+        print(f"Form errors: {form.errors}")
+        for field_name, errors in form.errors.items():
+            print(f"Field {field_name} errors: {errors}")
+
     if form.validate_on_submit():
+        print("=== FORM VALIDATION PASSED ===")
         # Print form data for debugging
         print(f'Week number data: {form.week_number.data}')
         print(f'Season data: {form.season.data}')
@@ -130,32 +174,47 @@ def create_match_week():
         print(f'Number of fixtures: {len(form.fixtures)}')
         
         for i, fixture_form in enumerate(form.fixtures):
+            print(f'Processing fixture {i}: home_team={fixture_form.home_team.data}, away_team={fixture_form.away_team.data}')
             if fixture_form.home_team.data and fixture_form.away_team.data:
                 print(f'Fixture {i+1}: {fixture_form.home_team.data} vs {fixture_form.away_team.data}')
         
-        match_week = MatchWeek(
-            week_id=form.week_number.data,
-            season_id=form.season.data,
-            predictions_open_time=form.predictions_open_time.data,
-            predictions_close_time=form.predictions_close_time.data
-        )
-        
-        db.session.add(match_week)
-        db.session.flush()  # This gets us the match_week.id
-        
-        for fixture_form in form.fixtures:
-            if fixture_form.home_team.data and fixture_form.away_team.data:
-                fixture = Fixture(
-                    season_id=form.season.data,
-                    match_week_id=match_week.id,
-                    home_team=fixture_form.home_team.data,
-                    away_team=fixture_form.away_team.data,
-                )
-                db.session.add(fixture)
-        
-        db.session.commit()        
-        flash(f'Match Week created successfully!', 'success')
-        return redirect(url_for('main.admin_dashboard'))
+        try:
+            match_week = MatchWeek(
+                week_id=form.week_number.data,
+                season_id=form.season.data,
+                predictions_open_time=form.predictions_open_time.data,
+                predictions_close_time=form.predictions_close_time.data
+            )
+            
+            print(f'Creating MatchWeek: week_id={form.week_number.data}, season_id={form.season.data}')
+            db.session.add(match_week)
+            db.session.flush()  # This gets us the match_week.id
+            print(f'MatchWeek created with ID: {match_week.id}')
+            
+            fixture_count = 0
+            for fixture_form in form.fixtures:
+                if fixture_form.home_team.data and fixture_form.away_team.data:
+                    fixture = Fixture(
+                        match_week_id=match_week.id,
+                        home_team=fixture_form.home_team.data,
+                        away_team=fixture_form.away_team.data,
+                    )
+                    db.session.add(fixture)
+                    fixture_count += 1
+                    print(f'Added fixture: {fixture_form.home_team.data} vs {fixture_form.away_team.data}')
+            
+            db.session.commit()
+            print(f'Successfully committed {fixture_count} fixtures to database')
+            flash(f'Match Week created successfully with {fixture_count} fixtures!', 'success')
+            return redirect(url_for('main.admin_dashboard'))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f'Error creating match week: {str(e)}')
+            flash(f'Error creating match week: {str(e)}', 'error')
+            return redirect(url_for('main.admin_dashboard'))
+    else:
+        print("=== FORM VALIDATION FAILED ===")
     return render_template('admin/create_match_week.html', form=form)
 
 
