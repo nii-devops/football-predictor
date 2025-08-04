@@ -90,6 +90,9 @@
                 </div>
             </div>
             
+            <!-- Add this inside your form, before the fixtures -->
+            <input type="hidden" id="fixtures-count" name="fixtures-count" value="{{ form.fixtures|length }}">
+
             <div class="text-end">
                 <a href="{{ url_for('main.admin_dashboard') }}" class="btn btn-secondary me-2">Cancel</a>
                 {{ form.submit(class="btn epl-primary text-white") }}
@@ -154,6 +157,9 @@ function updateFixtureNames() {
             }
         });
     });
+
+    // Update the hidden count field
+    document.getElementById('fixtures-count').value = fixtures.length;
 }
 
 
